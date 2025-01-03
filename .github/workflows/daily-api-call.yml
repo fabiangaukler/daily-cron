@@ -3,6 +3,7 @@ name: Daily API Call
 on:
   schedule:
     - cron: '0 17 * * *'  # Runs every day at 17:00 UTC (18:00 CET/CEST)
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
   call-api:
@@ -11,6 +12,25 @@ jobs:
     steps:
       - name: Make API Call
         run: |
-          curl -X GET "${{ secrets.API_ENDPOINT }}?ean=${{ secrets.EAN }}" \
-          -H "x-api-token: ${{ secrets.API_TOKEN }}" \
-          -H "cookie: ${{ secrets.COOKIE }}"
+          # Generate a filename with the current date
+          filename="response-$(date +'%Y-%m-%d').json"
+
+          # Make the API call and extract the 'price' attribute using jq
+          price=$(curl -s -X GET "${{ secrets.API_ENDPOINT }}?ean=${{ secrets.EAN }}" \
+            -H "x-api-token: ${{ secrets.API_TOKEN }}" \
+            -H "cookie: ${{ secrets.COOKIE }}" \
+            | jq -r '.price')  # Adjust '.price' to the actual path to the price in the JSON response
+
+          # Save the extracted price to a file
+          echo "Price: $price" > "$filename"  # Write the price to a file
+          
+          price=$(curl -s -X GET "${{ secrets.API_ENDPOINT }}?search=example" \
+            -H "x-api-token: ${{ secrets.API_TOKEN }}" \
+            -H "cookie: ${{ secrets.COOKIE }}" \
+            | jq -r '.price')  # Adjust '.price' to the actual path to the price in the JSON response
+
+      - name: Upload API Response as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: price-responses
+          path: responses/response-*.json  # Upload all response files from the 'responses' directory
